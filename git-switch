@@ -1,0 +1,54 @@
+#!/usr/bin/env php
+<?php
+$cmd = "git branch --no-color";
+$branches = explode("\n", rtrim(`$cmd`));
+
+$branches = array_map(
+    function($el) {
+        $selected = $el[0] === '*';
+        return [substr($el, 2), $selected];
+    },
+    $branches);
+
+usort($branches,
+    function($a, $b) {
+        if ($a[0] === 'master') {
+            return -1;
+        } elseif ($b[0] === 'master') {
+            return 1;
+        }
+        return $a[0] <=> $b[0];
+    });
+
+$branches = array_map(
+    function($el, $idx) { $el[] = $idx; return $el; },
+    $branches,
+    array_keys($branches));
+
+$padding = strlen(count($branches));
+
+$format = "[% {$padding}s] % 1s %s\n";
+
+$display = array_reduce($branches,
+    function($out, $el) use ($format) {
+        return $out . sprintf($format, $el[2], $el[1] ? '*' : '', $el[0]);
+    },
+    '');
+
+echo $display;
+echo "Your choice? ";
+
+$val = trim(fgets(STDIN, 1024));
+if (!ctype_digit($val)) {
+    echo "No branch selected, no change\n";
+    exit;
+}
+$val = (int) $val;
+$branch = $branches[$val] ?? null;
+if (!$branch) {
+    echo "Invalid branch.\n";
+    exit(1);
+}
+
+`git checkout {$branch[0]}`;
+exit(0);
