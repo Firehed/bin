@@ -17,7 +17,7 @@ usort($branches,
         } elseif ($b[0] === 'master') {
             return 1;
         }
-        return $a[0] <=> $b[0];
+        return strnatcasecmp($a[0], $b[0]);
     });
 
 $branches = array_map(
