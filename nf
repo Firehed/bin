@@ -12,7 +12,7 @@ Usage: %s [-tis] ClassName
     -h, --help: Show help and exit
 
 If the class name ends in `Test`, it will be assumed to be a PHPUnit test case
-and will automatically extends `\PHPUnit_Framework_TestCase`.
+and will automatically extends `\PHPUnit\Framework\TestCase`.
 
 FOO;
     e($msg, $_SERVER['argv'][0]);
@@ -107,7 +107,7 @@ GENPHP;
 	$docblock = '';
 	$extends = '';
 	if ($is_test) {
-		$extends = ' extends \PHPUnit_Framework_TestCase';
+		$extends = ' extends \PHPUnit\Framework\TestCase';
 		$covered_class = substr($classname, 0, -4); // trim trailing Test
 		$docblock = <<<GENPHP
 
