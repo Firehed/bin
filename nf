@@ -127,6 +127,7 @@ GENPHP;
 function handlePSR4(array $configs) {
 	$cwd = getcwd().DIRECTORY_SEPARATOR; // Necessary for root-level dir in NS
 	foreach ($configs as $prefix => $pathspecs) {
+        $prefix = rtrim($prefix, '\\');
 		foreach ((array)$pathspecs as $pathspec) {
 			if (!$pathspec) continue; // Ignore empty, it's valid but dumb
 			$try = PROJECT_ROOT.$pathspec;
