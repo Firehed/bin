@@ -93,7 +93,7 @@ function buildfile($ns, $classname, $is_test, $type, $strict) {
 	if (file_exists($filename)) {
 		e("File %s already exists!", $filename);
 	}
-    $strict_types = $strict ? "declare(strict_types=1);\n" : '';
+    $strict_types = $strict ? "\ndeclare(strict_types=1);\n" : '';
 	$template = <<<GENPHP
 <?php
 %s
