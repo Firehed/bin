@@ -3,6 +3,7 @@
 $cmd = "git branch --no-color";
 $branches = explode("\n", rtrim(`$cmd`));
 
+/** @var array{string, bool}[] name isSelected */
 $branches = array_map(
     function ($el) {
         $selected = $el[0] === '*';
@@ -23,6 +24,7 @@ usort(
     }
 );
 
+/** @var array{string, bool, int}[] name isSelected index */
 $branches = array_map(
     function ($el, $idx) {
         $el[] = $idx;
@@ -62,12 +64,23 @@ select($val, $branches);
 
 function select(int $choice, array $branches)
 {
+    if ($choice === 0) {
+        echo "Refusing to remove the default branch.\n";
+        echo "You need to do it manually: git branch -D {$branches[0][0]}\n";
+        exit(1);
+    }
+
     $branch = $branches[$choice] ?? null;
     if (!$branch) {
         echo "Invalid branch.\n";
         exit(1);
     }
+    list($branchName, $isSelected, $index) = $branch;
+    if ($isSelected) {
+        echo "Cannot remove the currently selected branch\n";
+        exit(1);
+    }
 
-    `git branch -D {$branch[0]}`;
+    `git branch -D {$branchName}`;
     exit(0);
 }
