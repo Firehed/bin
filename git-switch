@@ -14,9 +14,9 @@ $branches = array_map(
 usort(
     $branches,
     function ($a, $b) {
-        if ($a[0] === 'master') {
+        if ($a[0] === 'master' || $a[0] === 'main') {
             return -1;
-        } elseif ($b[0] === 'master') {
+        } elseif ($b[0] === 'master' || $b[0] === 'main') {
             return 1;
         }
         return strnatcasecmp($a[0], $b[0]);
