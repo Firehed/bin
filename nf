@@ -75,8 +75,8 @@ if (isset($opts['h']) || isset($opts['help'])) {
 }
 $classname = end($argv);
 $is_test = 'Test' == substr($classname, -4);
-$is_interface = isset($opts['i']) || isset($opts['interface']);
-$is_trait = isset($opts['t']) || isset($opts['test']);
+$is_interface = isset($opts['i']) || isset($opts['interface']) || str_ends_with($className, 'Interface');
+$is_trait = isset($opts['t']) || isset($opts['test']) || str_ends_with($className, 'Trait');
 $is_strict = isset($opts['s']) || isset($opts['strict']);
 
 if ($is_trait) $type = 'trait';
