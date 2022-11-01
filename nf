@@ -112,9 +112,7 @@ GENPHP;
 		$docblock = <<<GENPHP
 
 /**
- * @coversDefaultClass $ns\\$covered_class
- * @covers ::<protected>
- * @covers ::<private>
+ * @covers $ns\\$covered_class
  */
 GENPHP;
 	}
