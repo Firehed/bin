@@ -8,7 +8,6 @@ Usage: %s [-tis] ClassName
     Options:
     -t, --trait: Generate a Trait
     -i, --interface: Generate an Interface
-    -s, --strict: Add `declare(strict_types=1);`
     -h, --help: Show help and exit
 
 If the class name ends in `Test`, it will be assumed to be a PHPUnit test case
@@ -69,7 +68,7 @@ if (!$ns) {
 	e("Current path does not appear to be a defined namespace");
 }
 
-$opts = getopt('tish', ['trait', 'interface', 'strict', 'help']);
+$opts = getopt('tish', ['trait', 'interface', 'help']);
 if (isset($opts['h']) || isset($opts['help'])) {
     usage();
 }
@@ -77,15 +76,14 @@ $classname = end($argv);
 $is_test = 'Test' == substr($classname, -4);
 $is_interface = isset($opts['i']) || isset($opts['interface']) || str_ends_with($className, 'Interface');
 $is_trait = isset($opts['t']) || isset($opts['test']) || str_ends_with($className, 'Trait');
-$is_strict = isset($opts['s']) || isset($opts['strict']);
 
 if ($is_trait) $type = 'trait';
 elseif ($is_interface) $type = 'interface';
 else $type = 'class';
 
-buildfile($ns, end($argv), $is_test, $type, $is_strict);
+buildfile($ns, end($argv), $is_test, $type);
 
-function buildfile($ns, $classname, $is_test, $type, $strict) {
+function buildfile($ns, $classname, $is_test, $type) {
 	if (!is_writable(getcwd())) {
 		e("Current directory is not writable");
 	}
@@ -93,7 +91,7 @@ function buildfile($ns, $classname, $is_test, $type, $strict) {
 	if (file_exists($filename)) {
 		e("File %s already exists!", $filename);
 	}
-    $strict_types = $strict ? "\ndeclare(strict_types=1);\n" : '';
+    $strict_types = "\ndeclare(strict_types=1);\n";
 	$template = <<<GENPHP
 <?php
 %s
