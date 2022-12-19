@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+/Users/firehed/dev/github/firehed/git-tools/app git:show-changed-files
