@@ -41,7 +41,7 @@ $info = $nsl->resolve(end($argv));
 $builder = new TemplateBuilder($info['fqcn']);
 // $builder->setType(FileType::fooBar);
 $builder->write(to: $info['file']);
-var_dump($info);
+// var_dump($info);
 exit;
 
 // find composer manifest
@@ -312,13 +312,17 @@ class NamespaceLocator
 
 class TemplateBuilder
 {
-    // private string $fqcn;
     private TemplateType $type = TemplateType::AutoDetect;
     private bool $strictMode = true; // do not make configurable?
 
     private string $namespace;
     private string $name;
-    private array $uses;
+
+    // Metadata
+    private array $uses = [];
+    private array $annotations = [];
+    private array $attributes = [];
+    private ?string $extends = null;
 
 
     public function __construct(string $fqcn)
@@ -378,41 +382,96 @@ class TemplateBuilder
             $this->type = $this->detectType();
         }
 
-        if ($this->type === TemplateType::TestCase) {
-            $extends = 'TestCase';
-            $uses = [
-                \PHPUnit\Framework\TestCase::class,
-                // PHPUnit 10 ~ annotations?
-            ];
-            $classBeingTested = substr($this->name, 0, -4); // name without Test
-            // PHPUnit >= 10
-            $attributes = [
-                "#[CoversClass({$classBeingTested}::class)]",
-            ];
-            // PHPUnit < 10
-            $annotations = [
-                "@covers {$classBeingTested}",
-            ];
 
-            var_dump($uses, $attributes, $annotations);
+        if ($this->type === TemplateType::TestCase) {
+            $this->setExtends(\PHPUnit\Framework\TestCase::class);
+            $classBeingTested = substr($this->name, 0, -4); // name without Test
+
+            if ($this->shouldUsePHPUnitAttributes()) {
+                $this->attributes[] = "#[CoversClass({$classBeingTested}::class)]";
+                $this->uses[] = \PHPUnit\Framework\Attributes\CoversClass::class;
+            } else {
+                $this->annotations[] = "@covers {$classBeingTested}";
+            }
+
         }
+
+        print_R($this);
 
         $tpl = <<<php
         <?php
 
-        declare(strict_types=1);
+        {$this->buildStrict()}
 
         namespace {$this->namespace};
 
-        // use here
+        {$this->buildUses()}
 
-        {$this->getTypeName()} {$this->name} [extends]
+        {$this->buildAnnotations()}
+        {$this->buildAttributes()}
+        {$this->getTypeName()} {$this->name} {$this->buildExtends()}
         {
         }
         php;
 
-        print_r($this);
+        // print_r($this);
 
+        // todo: trim trailing whitespace and collapse multiple newlines
         return $tpl;
+    }
+
+    private function buildStrict(): string
+    {
+        return $this->strictMode ? 'declare(strict_types=1);' : '';
+    }
+
+    private function buildUses(): string
+    {
+        if (!$this->uses) {
+            return '';
+        }
+
+        $uses = array_map(fn ($fqcn) => "use $fqcn;", $this->uses);
+        sort($uses);
+
+        return "\n" . implode("\n", $uses) . "\n";
+    }
+
+    private function buildAnnotations(): string
+    {
+        if (!$this->annotations) {
+            return '';
+        }
+        $formattedAnnotations = array_map(fn ($plain) => ' * ' . $plain, $this->annotations);
+        return sprintf("/**\n%s\n */", implode("\n", $formattedAnnotations));
+    }
+    private function buildAttributes(): string
+    {
+        if (!$this->attributes) {
+            return '';
+        }
+        sort($this->attributes);
+        return implode("\n", $this->attributes);
+    }
+
+    private function buildExtends(): string
+    {
+        if ($this->extends) {
+            return sprintf('extends %s', $this->extends);
+        }
+        return '';
+    }
+
+    private function setExtends(string $base): void
+    {
+        $this->uses[] = $base;
+        $parts = explode('\\', $base);
+        $this->extends = end($parts);
+    }
+
+    private function shouldUsePHPUnitAttributes(): bool
+    {
+        // FIXME: look at composer.lock and find the version
+        return true;
     }
 }
