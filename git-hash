@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+git log -1 --format=%H | tr -d '\n' | pbcopy
+pbpaste
