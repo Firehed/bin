@@ -396,7 +396,7 @@ class TemplateBuilder
 
         }
 
-        print_R($this);
+        // print_R($this);
 
         $tpl = <<<php
         <?php
@@ -414,10 +414,10 @@ class TemplateBuilder
         }
         php;
 
-        // print_r($this);
-
-        // todo: trim trailing whitespace and collapse multiple newlines
-        return $tpl;
+        // Collapse consecutive blank lines
+        $outputWithoutDupeNewline = preg_replace('/\n\n\n+/', "\n\n", $tpl);
+        // Now trim trailing whitespace (note: not \s which grabs newlines too)
+        return preg_replace('/\h+$/m', '', $outputWithoutDupeNewline);
     }
 
     private function buildStrict(): string
