@@ -233,8 +233,7 @@ class TemplateBuilder
 
         {$this->buildUses()}
 
-        {$this->buildAnnotations()}
-        {$this->buildAttributes()}
+        {$this->buildAnnotationsAndAttributes()}
         {$this->getTypeName()} {$this->name} {$this->buildExtends()}
         {
         }
@@ -263,6 +262,21 @@ class TemplateBuilder
         return "\n" . implode("\n", $uses) . "\n";
     }
 
+    private function buildAnnotationsAndAttributes(): string
+    {
+        $annotations = $this->buildAnnotations();
+        $attributes = $this->buildAttributes();
+
+        if (!$annotations) {
+            return $attributes;
+        }
+        if (!$attributes) {
+            return $annotations;
+        }
+        // Both are set. Combine.
+        return sprintf("%s\n%s", $annotations, $attributes);
+    }
+
     private function buildAnnotations(): string
     {
         if (!$this->annotations) {
@@ -271,6 +285,7 @@ class TemplateBuilder
         $formattedAnnotations = array_map(fn ($plain) => ' * ' . $plain, $this->annotations);
         return sprintf("/**\n%s\n */", implode("\n", $formattedAnnotations));
     }
+
     private function buildAttributes(): string
     {
         if (!$this->attributes) {
