@@ -13,25 +13,16 @@ enum TemplateType
     case TestCase;
 }
 
-class NamespaceLocator
+class Project
 {
     /**
      * Absolute path to project root, as defined by presence of composer.json
      */
-    private string $projectRoot;
-    /**
-     * Path from project root (without leading or trailing DS)
-     */
-    private string $relativeCwd;
+    public readonly string $root;
 
-    private array $relativeDirectoryToNamespace;
-
-    public function __construct(string $cwd)
+    public function __construct(public readonly string $cwd)
     {
-        $this->projectRoot = $this->findProjectRoot($cwd);
-        $this->relativeCwd = $this->findRelativeCwd($cwd);
-
-        $this->processComposerJson();
+        $this->root = $this->findProjectRoot($cwd);
     }
 
     private function findProjectRoot(string $cwd): string
@@ -44,58 +35,67 @@ class NamespaceLocator
             // Go one higher
             $cwd = dirname($cwd);
         } while ($cwd !== DIRECTORY_SEPARATOR);
+
         throw new \RuntimeException('composer.json not found all the way up to FS root');
+    }
+
+    public function readComposerJson(): array
+    {
+        return $this->read('composer.json');
+    }
+
+    public function readComposerLock(): array
+    {
+        return $this->read('composer.lock');
+    }
+
+    private function read(string $file): array
+    {
+        $path = $this->root . '/' . $file;
+        $json = file_get_contents($path);
+        return json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+    }
+}
+
+class NamespaceLocator
+{
+    /**
+     * Path from project root (without leading or trailing DS)
+     */
+    private string $relativeCwd;
+
+    private array $relativeDirectoryToNamespace;
+
+    public function __construct(private Project $project)
+    {
+        $this->relativeCwd = $this->findRelativeCwd($project->cwd);
+
+        $this->processComposerJson();
     }
 
     private function findRelativeCwd(string $cwd): string
     {
-        return self::normalizePath(mb_substr($cwd, mb_strlen($this->projectRoot)));
+        return self::normalizePath(mb_substr($cwd, mb_strlen($this->project->root)));
     }
 
     private function processComposerJson(): void
     {
-        $path = $this->projectRoot . '/composer.json';
-        $json = file_get_contents($path);
-        $data = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
-
-        // FIXME: AKE/autoload
+        $data = $this->project->readComposerJson();
 
         $psr4Parser = function ($data) {
             foreach ($data as $namespace => $directories) {
                 foreach ((array) $directories as $directory) {
-                    // var_dump($namespace, $directory);
                     $this->relativeDirectoryToNamespace[self::normalizePath($directory)] = self::normalizePath($namespace);
                 }
             }
         };
 
-
-        // FIXME: AKE/psr-4
         $autoload = $data['autoload']['psr-4'] ?? [];
         $autoloadDev = $data['autoload-dev']['psr-4'] ?? [];
         $psr4Parser($autoload);
         $psr4Parser($autoloadDev);
-        // FIXME: warn on PSR-0 presence
 
-        // print_r($this->relativeDirectoryToNamespace);
-
-        /*
-        // Figure out NS of rCWD
-        foreach ($this->relativeDirectoryToNamespace as $dir => $baseNs) {
-            if (str_starts_with(haystack: $this->relativeCwd, needle: $dir)) {
-                // We've found a NS root - replace the relative root dir with the NS
-                $relativeNs = mb_substr($this->relativeCwd, mb_strlen($dir));
-                $fqns = self::pathToNs($baseNs. $relativeNs);
-                $this->namespaceOfCwd = $fqns;
-                return;
-            }
-        }
-         */
-        // Not found - autoloader not available??
-        // throw new \RuntimeException('Autoloader not configured for cure
-
-
-        // var_dump($autoload, $autoloadDev);
+        // FIXME: warn on PSR-0 presence or otherwise no mappings
     }
 
     /**
@@ -115,14 +115,11 @@ class NamespaceLocator
                 $fqcn = self::pathToNs($baseNs . $relativeNs);
                 return [
                     'fqcn' => $fqcn,
-                    'file' => sprintf('%s/%s.php', $this->projectRoot, $target),
+                    'file' => sprintf('%s/%s.php', $this->project->root, $target),
                 ];
-                var_dump($fqcn, $file, $this->projectRoot);
-                exit;
-                // return;
             }
         }
-        // throw not resolvable
+        throw new RuntimeException('Could not resolve namespace - are your autoloaders set right?');
     }
 
     /**
@@ -142,13 +139,6 @@ class NamespaceLocator
     {
         return str_replace('/', '\\', $path);
     }
-
-    private static function getTrailingPathIfLeadingIsSet(string $haystack, string $needle): ?string
-    {
-        if (!str_starts_with($haystack, $needle)) {
-            return null;
-        }
-    }
 }
 
 class TemplateBuilder
@@ -166,7 +156,7 @@ class TemplateBuilder
     private ?string $extends = null;
 
 
-    public function __construct(string $fqcn)
+    public function __construct(private Project $project, string $fqcn)
     {
         $components = explode('\\', $fqcn);
 
@@ -222,7 +212,6 @@ class TemplateBuilder
             $this->type = $this->detectType();
         }
 
-
         if ($this->type === TemplateType::TestCase) {
             $this->setExtends(\PHPUnit\Framework\TestCase::class);
             $classBeingTested = substr($this->name, 0, -4); // name without Test
@@ -233,10 +222,7 @@ class TemplateBuilder
             } else {
                 $this->annotations[] = "@covers {$classBeingTested}";
             }
-
         }
-
-        // print_R($this);
 
         $tpl = <<<php
         <?php
@@ -311,7 +297,24 @@ class TemplateBuilder
 
     private function shouldUsePHPUnitAttributes(): bool
     {
-        // FIXME: look at composer.lock and find the version
+        $lockData = $this->project->readComposerLock();
+
+        $findPhpunit = function ($packageList): ?array {
+            foreach ($packageList as $package) {
+                if ($package['name'] === 'phpunit/phpunit') {
+                    return $package;
+                }
+            }
+            return null;
+        };
+
+        if ($requireDev = $findPhpunit($lockData['packages-dev'])) {
+            return version_compare($requireDev['version'], '10.0.0', '>=');
+        } elseif ($require = $findPhpunit($lockData['packages'])) {
+            return version_compare($require['version'], '10.0.0', '>=');
+        }
+
+        trigger_error(E_USER_WARNING, 'PHPUnit not found, acting as 10+');
         return true;
     }
 }
@@ -355,10 +358,11 @@ if (isset($opts['h']) || isset($opts['help'])) {
 }
 $name = end($argv);
 
-$nsl = new NamespaceLocator(getcwd());
+$project = new Project(getcwd());
+$nsl = new NamespaceLocator($project);
 $info = $nsl->resolve($name);
 
-$builder = new TemplateBuilder($info['fqcn']);
+$builder = new TemplateBuilder($project, $info['fqcn']);
 
 if (isset($opts['i']) || isset($opts['interface'])) {
     $builder->setType(TemplateType::Interface);
