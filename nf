@@ -212,8 +212,7 @@ class TemplateBuilder
 
     public function write(string $to): void
     {
-        echo $this->build();
-        // file_put_contents($to, $this->build());
+        file_put_contents($to, $this->build());
     }
 
     private function build(): string
